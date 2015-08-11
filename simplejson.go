@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"strings"
 )
 
 // returns the current implementation version
@@ -192,6 +193,18 @@ func (j *Json) Bool() (bool, error) {
 	if s, ok := (j.data).(bool); ok {
 		return s, nil
 	}
+	strbyte, err := j.Encode()
+	if err != nil {
+		return false, nil
+	}
+	if strings.HasPrefix(string(strbyte), `"`) && strings.HasSuffix(string(strbyte), `"`) {
+		str := strings.Trim(string(strbyte), `"`)
+		js, err := NewJson([]byte(str))
+		if err != nil {
+			return false, nil
+		}
+		return js.Bool()
+	}
 	return false, errors.New("type assertion to bool failed")
 }
 
@@ -200,15 +213,20 @@ func (j *Json) String() (string, error) {
 	if s, ok := (j.data).(string); ok {
 		return s, nil
 	}
-	return "", errors.New("type assertion to string failed")
+	if j.Interface() == nil {
+		return "", errors.New("type assert to string failed")
+	}
+	strbyte, err := j.Encode()
+	if err != nil {
+		return "", err
+	}
+	return string(strbyte), nil
 }
 
 // Bytes type asserts to `[]byte`
 func (j *Json) Bytes() ([]byte, error) {
-	if s, ok := (j.data).(string); ok {
-		return []byte(s), nil
-	}
-	return nil, errors.New("type assertion to []byte failed")
+	str, err := j.String()
+	return []byte(str), err
 }
 
 // StringArray type asserts to an `array` of `string`
