@@ -213,14 +213,7 @@ func (j *Json) String() (string, error) {
 	if s, ok := (j.data).(string); ok {
 		return s, nil
 	}
-	if j.Interface() == nil {
-		return "", errors.New("type assert to string failed")
-	}
-	strbyte, err := j.Encode()
-	if err != nil {
-		return "", err
-	}
-	return string(strbyte), nil
+	return "", errors.New("type assertion to string failed")
 }
 
 // Bytes type asserts to `[]byte`
