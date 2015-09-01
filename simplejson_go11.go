@@ -48,7 +48,7 @@ func (j *Json) Float64() (float64, error) {
 		str := strings.Trim(string(strbyte), `"`)
 		js, err := NewJson([]byte(str))
 		if err != nil {
-			return 0, nil
+			return 0, err
 		}
 		return js.Float64()
 	}
@@ -76,7 +76,7 @@ func (j *Json) Int() (int, error) {
 		str := strings.Trim(string(strbyte), `"`)
 		js, err := NewJson([]byte(str))
 		if err != nil {
-			return 0, nil
+			return 0, err
 		}
 		return js.Int()
 	}
