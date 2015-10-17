@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -32,20 +33,13 @@ func (j *Json) Float64() (float64, error) {
 		return float64(reflect.ValueOf(j.data).Int()), nil
 	case uint, uint8, uint16, uint32, uint64:
 		return float64(reflect.ValueOf(j.data).Uint()), nil
-	}
-	strbyte, err := j.Encode()
-	if err != nil {
-		return 0, err
-	}
-	if strings.HasPrefix(string(strbyte), `"`) && strings.HasSuffix(string(strbyte), `"`) {
-		str := strings.Trim(string(strbyte), `"`)
-		js, err := NewJson([]byte(str))
-		if err != nil {
-			return 0, nil
+	case string:
+		str := strings.Trim(reflect.ValueOf(j.data).String(), `"`)
+		val, err := strconv.ParseFloat(str, 10)
+		if err == nil {
+			return val, nil
 		}
-		return js.Float64()
 	}
-
 	return 0, errors.New("invalid value type")
 }
 
@@ -58,20 +52,13 @@ func (j *Json) Int() (int, error) {
 		return int(reflect.ValueOf(j.data).Int()), nil
 	case uint, uint8, uint16, uint32, uint64:
 		return int(reflect.ValueOf(j.data).Uint()), nil
-	}
-	strbyte, err := j.Encode()
-	if err != nil {
-		return 0, err
-	}
-	if strings.HasPrefix(string(strbyte), `"`) && strings.HasSuffix(string(strbyte), `"`) {
-		str := strings.Trim(string(strbyte), `"`)
-		js, err := NewJson([]byte(str))
-		if err != nil {
-			return 0, nil
+	case string:
+		str := strings.Trim(reflect.ValueOf(j.data).String(), `"`)
+		val, err := strconv.ParseInt(str, 10, 0)
+		if err == nil {
+			return int(val), nil
 		}
-		return js.Int()
 	}
-	return 0, errors.New("invalid value type")
 }
 
 // Int64 coerces into an int64
@@ -83,18 +70,12 @@ func (j *Json) Int64() (int64, error) {
 		return reflect.ValueOf(j.data).Int(), nil
 	case uint, uint8, uint16, uint32, uint64:
 		return int64(reflect.ValueOf(j.data).Uint()), nil
-	}
-	strbyte, err := j.Encode()
-	if err != nil {
-		return 0, nil
-	}
-	if strings.HasPrefix(string(strbyte), `"`) && strings.HasSuffix(string(strbyte), `"`) {
-		str := strings.Trim(string(strbyte), `"`)
-		js, err := NewJson([]byte(str))
-		if err != nil {
-			return 0, nil
+	case string:
+		str := strings.Trim(reflect.ValueOf(j.data).String(), `"`)
+		val, err := strconv.ParseInt(str, 10, 64)
+		if err == nil {
+			return val, nil
 		}
-		return js.Int64()
 	}
 	return 0, errors.New("invalid value type")
 }
@@ -108,18 +89,12 @@ func (j *Json) Uint64() (uint64, error) {
 		return uint64(reflect.ValueOf(j.data).Int()), nil
 	case uint, uint8, uint16, uint32, uint64:
 		return reflect.ValueOf(j.data).Uint(), nil
-	}
-	strbyte, err := j.Encode()
-	if err != nil {
-		return 0, nil
-	}
-	if strings.HasPrefix(string(strbyte), `"`) && strings.HasSuffix(string(strbyte), `"`) {
-		str := strings.Trim(string(strbyte), `"`)
-		js, err := NewJson([]byte(str))
-		if err != nil {
-			return 0, nil
+	case string:
+		str := strings.Trim(reflect.ValueOf(j.data).String(), `"`)
+		val, err := strconv.ParseUint(str, 10, 64)
+		if err == nil {
+			return val, nil
 		}
-		return js.Uint64()
 	}
 	return 0, errors.New("invalid value type")
 }

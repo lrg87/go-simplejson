@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"reflect"
+	"strconv"
 	"strings"
 )
+
+var errNil = errors.New("the data is nil")
 
 // returns the current implementation version
 func Version() string {
@@ -57,11 +61,37 @@ func (j *Json) MarshalJSON() ([]byte, error) {
 // Set modifies `Json` map by `key` and `value`
 // Useful for changing single key/value in a `Json` object easily.
 func (j *Json) Set(key string, val interface{}) {
-	m, err := j.Map()
-	if err != nil {
+	if err := j.SetObjectVal(key, val); err != nil {
+		j.SetMapVal(key, val)
+	}
+	return
+}
+func (j *Json) SetObjectVal(key string, val interface{}) error {
+	if j.data == nil {
+		return errNil
+	}
+	data := reflect.ValueOf(j.data)
+	if data.Type().Kind() == reflect.Struct {
+		childValue := data.FieldByName(key)
+		assignval := reflect.ValueOf(val)
+		if childValue.CanSet() && assignval.Type().AssignableTo(childValue.Type()) {
+			childValue.Set(assignval)
+			return nil
+		}
+	}
+	return errors.New("the value is not struct")
+}
+func (j *Json) SetMapVal(key string, val interface{}) {
+	if j.data == nil {
 		return
 	}
-	m[key] = val
+	data := reflect.ValueOf(j.data)
+	if data.Type().Kind() == reflect.Map {
+		assignval := reflect.ValueOf(val)
+		if data.Type().Key().Kind() == reflect.String && assignval.Type().AssignableTo(data.Type().Elem()) {
+			data.SetMapIndex(reflect.ValueOf(key), assignval)
+		}
+	}
 }
 
 // SetPath modifies `Json`, recursively checking/creating map keys for the supplied path,
@@ -105,11 +135,16 @@ func (j *Json) SetPath(branch []string, val interface{}) {
 
 // Del modifies `Json` map by deleting `key` if it is present.
 func (j *Json) Del(key string) {
-	m, err := j.Map()
-	if err != nil {
+	if j.data == nil {
 		return
 	}
-	delete(m, key)
+	data := reflect.ValueOf(j.data)
+	if data.Type().Kind() == reflect.Map {
+		if data.Type().Key().Kind() == reflect.String {
+			data.SetMapIndex(reflect.ValueOf(key), reflect.Value{})
+		}
+	}
+	return
 }
 
 // Get returns a pointer to a new `Json` object
@@ -173,19 +208,55 @@ func (j *Json) CheckGet(key string) (*Json, bool) {
 }
 
 // Map type asserts to `map`
-func (j *Json) Map() (map[string]interface{}, error) {
-	if m, ok := (j.data).(map[string]interface{}); ok {
-		return m, nil
+func (j *Json) Map() (result map[string]interface{}, err error) {
+	if j.data == nil {
+		err = errNil
+		return
 	}
-	return nil, errors.New("type assertion to map[string]interface{} failed")
+	result = make(map[string]interface{})
+	data := reflect.ValueOf(j.data)
+	kindtype := data.Type().Kind()
+	if kindtype == reflect.Map {
+		keys := data.MapKeys()
+		for _, key := range keys {
+			strkey, err := generateStringKey(key.Interface())
+			if err != nil {
+				return nil, err
+			}
+			val := data.MapIndex(key)
+			result[strkey] = val.Interface()
+		}
+	} else if kindtype == reflect.Struct {
+		for i := 0; i < data.Type().NumField(); i++ {
+			key := data.Type().Field(i).Name
+			val := data.Field(i).Interface()
+			result[key] = val
+		}
+	} else {
+		err = errors.New("type assertion to map[string]interface{} failed")
+
+	}
+	return
 }
 
 // Array type asserts to an `array`
-func (j *Json) Array() ([]interface{}, error) {
-	if a, ok := (j.data).([]interface{}); ok {
-		return a, nil
+func (j *Json) Array() (result []interface{}, err error) {
+	if j.data == nil {
+		err = errNil
+		return
 	}
-	return nil, errors.New("type assertion to []interface{} failed")
+	result = make([]interface{}, 0)
+	data := reflect.ValueOf(j.data)
+	kindtype := data.Type().Kind()
+	if kindtype == reflect.Array || kindtype == reflect.Slice {
+		for i := 0; i < data.Len(); i++ {
+			val := data.Index(i).Interface()
+			result = append(result, val)
+		}
+	} else {
+		err = errors.New("type assertion to []interface{} failed")
+	}
+	return
 }
 
 // Bool type asserts to `bool`
@@ -193,27 +264,25 @@ func (j *Json) Bool() (bool, error) {
 	if s, ok := (j.data).(bool); ok {
 		return s, nil
 	}
-	strbyte, err := j.Encode()
-	if err != nil {
-		return false, nil
-	}
-	if strings.HasPrefix(string(strbyte), `"`) && strings.HasSuffix(string(strbyte), `"`) {
-		str := strings.Trim(string(strbyte), `"`)
-		js, err := NewJson([]byte(str))
-		if err != nil {
-			return false, nil
+	if s, ok := (j.data).(string); ok {
+		s := strings.Trim(s, `"`)
+		val, err := strconv.ParseBool(s)
+		if err == nil {
+			return val, nil
 		}
-		return js.Bool()
 	}
 	return false, errors.New("type assertion to bool failed")
 }
 
 // String type asserts to `string`
 func (j *Json) String() (string, error) {
+	if j.data == nil {
+		return "", errNil
+	}
 	if s, ok := (j.data).(string); ok {
 		return s, nil
 	}
-	return "", errors.New("type assertion to string failed")
+	return generateStringKey(j.data)
 }
 
 // Bytes type asserts to `[]byte`
@@ -234,8 +303,8 @@ func (j *Json) StringArray() ([]string, error) {
 			retArr = append(retArr, "")
 			continue
 		}
-		s, ok := a.(string)
-		if !ok {
+		s, err := generateStringKey(a)
+		if err != nil {
 			return nil, err
 		}
 		retArr = append(retArr, s)

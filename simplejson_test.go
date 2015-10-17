@@ -246,3 +246,36 @@ func TestPathWillOverwriteExisting(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, "bar", s)
 }
+func TestDatatype(t *testing.T) {
+	js := New()
+	data := make(map[int]int)
+	data[1] = 1
+	data[2] = 2
+	data[3] = 3
+	js.Set("data", data)
+	d2 := js.Get("data")
+	m := d2.MustMap()
+	assert.Equal(t, 1, m["1"])
+	assert.Equal(t, 2, m["2"])
+	assert.Equal(t, 3, m["3"])
+
+	arr := make([]int, 0)
+	arr = append(arr, 1)
+	arr = append(arr, 2)
+	arr = append(arr, 3)
+	js.Set("array", arr)
+	assert.Equal(t, 1, js.Get("array").GetIndex(0).MustInt())
+	assert.Equal(t, 2, js.Get("array").GetIndex(1).MustInt())
+	assert.Equal(t, 3, js.Get("array").GetIndex(2).MustInt())
+
+	arrstr := make([]string, 0)
+	arrstr = append(arrstr, "1")
+	arrstr = append(arrstr, "2")
+	arrstr = append(arrstr, "3")
+
+	js.Set("arrstr", arrstr)
+	assert.Equal(t, 1, js.Get("arrstr").GetIndex(0).MustInt())
+	assert.Equal(t, 2, js.Get("arrstr").GetIndex(1).MustInt())
+	assert.Equal(t, 3, js.Get("arrstr").GetIndex(2).MustInt())
+
+}
