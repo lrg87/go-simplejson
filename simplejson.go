@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-var errNil = errors.New("the data is nil")
-
 // returns the current implementation version
 func Version() string {
 	return "0.5.0-alpha"
@@ -77,11 +75,11 @@ func (j *Json) SetPath(branch []string, val interface{}) {
 	}
 
 	// in order to insert our branch, we need map[string]interface{}
-	if _, ok := (j.data).(map[string]interface{}); !ok {
+	if _, err := j.Map(); err != nil {
 		// have to replace with something suitable
 		j.data = make(map[string]interface{})
 	}
-	curr := j.data.(map[string]interface{})
+	curr, _ := (j.data).(map[string]interface{})
 
 	for i := 0; i < len(branch)-1; i++ {
 		b := branch[i]
@@ -92,14 +90,11 @@ func (j *Json) SetPath(branch []string, val interface{}) {
 			curr = n
 			continue
 		}
-
-		// make sure the value is the right sort of thing
-		if _, ok := curr[b].(map[string]interface{}); !ok {
-			// have to replace with something suitable
+		childj := &Json{curr[b]}
+		if _, err := childj.Map(); err != nil {
 			n := make(map[string]interface{})
 			curr[b] = n
 		}
-
 		curr = curr[b].(map[string]interface{})
 	}
 
@@ -182,7 +177,7 @@ func (j *Json) Map() (result map[string]interface{}, err error) {
 		return m, nil
 	}
 	if j.data == nil {
-		err = errNil
+		err = errors.New("type assertion to map[string]interface{} failed")
 		return
 	}
 	result = make(map[string]interface{})
@@ -219,7 +214,7 @@ func (j *Json) Array() (result []interface{}, err error) {
 		return a, nil
 	}
 	if j.data == nil {
-		err = errNil
+		err = errors.New("type assertion to []interface{} failed")
 		return
 	}
 	result = make([]interface{}, 0)
@@ -256,13 +251,14 @@ func (j *Json) Bool() (bool, error) {
 
 // String type asserts to `string`
 func (j *Json) String() (string, error) {
-	if j.data == nil {
-		return "", errNil
-	}
 	if s, ok := (j.data).(string); ok {
 		return s, nil
 	}
-	return generateStringKey(j.data)
+	if val, err := generateStringKey(j.data); err != nil {
+		return "", errors.New("type assertion to string failed")
+	} else {
+		return val, nil
+	}
 }
 
 // Bytes type asserts to `[]byte`
@@ -503,4 +499,24 @@ func (j *Json) MustUint64(args ...uint64) uint64 {
 	}
 
 	return def
+}
+
+func generateStringKey(key interface{}) (string, error) {
+	if key == nil {
+		return "", errors.New("key is nil")
+	}
+	switch reflect.ValueOf(key).Type().Kind() {
+	case reflect.Bool:
+		fallthrough
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float32, reflect.Float64:
+		fallthrough
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		str, err := json.Marshal(key)
+		if err == nil {
+			return string(str), nil
+		}
+	case reflect.String:
+		return key.(string), nil
+	}
+	return "", errors.New("Type is error")
 }
