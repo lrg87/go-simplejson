@@ -61,37 +61,11 @@ func (j *Json) MarshalJSON() ([]byte, error) {
 // Set modifies `Json` map by `key` and `value`
 // Useful for changing single key/value in a `Json` object easily.
 func (j *Json) Set(key string, val interface{}) {
-	if err := j.SetObjectVal(key, val); err != nil {
-		j.SetMapVal(key, val)
-	}
-	return
-}
-func (j *Json) SetObjectVal(key string, val interface{}) error {
-	if j.data == nil {
-		return errNil
-	}
-	data := reflect.ValueOf(j.data)
-	if data.Type().Kind() == reflect.Struct {
-		childValue := data.FieldByName(key)
-		assignval := reflect.ValueOf(val)
-		if childValue.CanSet() && assignval.Type().AssignableTo(childValue.Type()) {
-			childValue.Set(assignval)
-			return nil
-		}
-	}
-	return errors.New("the value is not struct")
-}
-func (j *Json) SetMapVal(key string, val interface{}) {
-	if j.data == nil {
+	m, err := j.Map()
+	if err != nil {
 		return
 	}
-	data := reflect.ValueOf(j.data)
-	if data.Type().Kind() == reflect.Map {
-		assignval := reflect.ValueOf(val)
-		if data.Type().Key().Kind() == reflect.String && assignval.Type().AssignableTo(data.Type().Elem()) {
-			data.SetMapIndex(reflect.ValueOf(key), assignval)
-		}
-	}
+	m[key] = val
 }
 
 // SetPath modifies `Json`, recursively checking/creating map keys for the supplied path,
@@ -135,16 +109,11 @@ func (j *Json) SetPath(branch []string, val interface{}) {
 
 // Del modifies `Json` map by deleting `key` if it is present.
 func (j *Json) Del(key string) {
-	if j.data == nil {
+	m, err := j.Map()
+	if err != nil {
 		return
 	}
-	data := reflect.ValueOf(j.data)
-	if data.Type().Kind() == reflect.Map {
-		if data.Type().Key().Kind() == reflect.String {
-			data.SetMapIndex(reflect.ValueOf(key), reflect.Value{})
-		}
-	}
-	return
+	delete(m, key)
 }
 
 // Get returns a pointer to a new `Json` object
@@ -209,6 +178,9 @@ func (j *Json) CheckGet(key string) (*Json, bool) {
 
 // Map type asserts to `map`
 func (j *Json) Map() (result map[string]interface{}, err error) {
+	if m, ok := (j.data).(map[string]interface{}); ok {
+		return m, nil
+	}
 	if j.data == nil {
 		err = errNil
 		return
@@ -234,13 +206,18 @@ func (j *Json) Map() (result map[string]interface{}, err error) {
 		}
 	} else {
 		err = errors.New("type assertion to map[string]interface{} failed")
-
+	}
+	if err == nil {
+		j.data = result
 	}
 	return
 }
 
 // Array type asserts to an `array`
 func (j *Json) Array() (result []interface{}, err error) {
+	if a, ok := (j.data).([]interface{}); ok {
+		return a, nil
+	}
 	if j.data == nil {
 		err = errNil
 		return
@@ -255,6 +232,9 @@ func (j *Json) Array() (result []interface{}, err error) {
 		}
 	} else {
 		err = errors.New("type assertion to []interface{} failed")
+	}
+	if err == nil {
+		j.data = result
 	}
 	return
 }
