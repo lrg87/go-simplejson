@@ -262,9 +262,12 @@ func (j *Json) String() (string, error) {
 }
 
 // Bytes type asserts to `[]byte`
+//in Json ,[]byte and string may not equal.when marshal []byte to string,it will be encode as base64
 func (j *Json) Bytes() ([]byte, error) {
-	str, err := j.String()
-	return []byte(str), err
+	if s, ok := (j.data).([]byte); ok {
+		return s, nil
+	}
+	return nil, errors.New("type assertion to []byte failed")
 }
 
 // StringArray type asserts to an `array` of `string`
